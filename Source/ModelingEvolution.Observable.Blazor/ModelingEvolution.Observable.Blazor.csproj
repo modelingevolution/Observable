@@ -4,8 +4,24 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>Observable.Blazor</Title>
+    <AssemblyVersion>0.0.0.1</AssemblyVersion>
+    <FileVersion>0.0.0.1</FileVersion>
+    <PackageTags>Observable;MVVM</PackageTags>
+    <PackageDescription>Minimal classes for Observable</PackageDescription>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/modelingevolution/observable</RepositoryUrl>
+    <GenerateDocumentationFile>False</GenerateDocumentationFile>
+    <Copyright>ModelingEvolution</Copyright>
+    <Authors>ModelingEvolution Team</Authors>
   </PropertyGroup>
-
+  <ItemGroup>
+    <None Include=".\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <SupportedPlatform Include="browser" />

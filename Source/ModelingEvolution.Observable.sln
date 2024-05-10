@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.34818.151
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModelingEvolution.Observable", "ModelingEvolution.Observable\ModelingEvolution.Observable.csproj", "{6841B9E2-890D-4C48-BEDF-409F98813B19}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModelingEvolution.Observable.Blazor", "ModelingEvolution.Observable.Blazor\ModelingEvolution.Observable.Blazor.csproj", "{908733B1-8091-4F6E-9186-21D2EC3318BC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6841B9E2-890D-4C48-BEDF-409F98813B19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6841B9E2-890D-4C48-BEDF-409F98813B19}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6841B9E2-890D-4C48-BEDF-409F98813B19}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6841B9E2-890D-4C48-BEDF-409F98813B19}.Release|Any CPU.Build.0 = Release|Any CPU
+		{908733B1-8091-4F6E-9186-21D2EC3318BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{908733B1-8091-4F6E-9186-21D2EC3318BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{908733B1-8091-4F6E-9186-21D2EC3318BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{908733B1-8091-4F6E-9186-21D2EC3318BC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CAA771D4-17F0-4E3E-9FE5-129EE37426DB}
+	EndGlobalSection
+EndGlobal
