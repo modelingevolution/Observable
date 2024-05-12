@@ -20,19 +20,15 @@
         set
         {
             if (object.Equals(_source, value)) return;
-
-
+            
             if (_source != null)
                 ((INotifyPropertyChanged)(_source)).PropertyChanged -= OnPropertyChanged;
             _source = value;
-
-
+            
 
             if (_source != null)
                 ((INotifyPropertyChanged)(_source)).PropertyChanged += OnPropertyChanged;
-
-
-
+                
         }
     }
     private void OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
