@@ -227,7 +227,29 @@ namespace ModelingEvolution.Observable
                     else yield break;
                 }
             }
-        
+
+        public static IEnumerable<T> For<T>(this IReadOnlyList<T> list, Predicate<T>? filter)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                T item = default(T);
+                bool isOk = true;
+                try
+                {
+                    item = list[i];
+                }
+                catch
+                {
+                    isOk = false;
+                }
+
+                if (isOk && (filter == null || filter(item)))
+                    yield return item;
+                else if (!isOk)
+                    yield break;
+            }
+        }
+
         private static readonly CultureInfo EN_US = new CultureInfo("en-US");
        
         public static string ToDebugString(this string s)

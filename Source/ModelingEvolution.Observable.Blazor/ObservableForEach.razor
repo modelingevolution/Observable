@@ -2,24 +2,24 @@
 @using System.Collections.Specialized
 
 @typeparam TItem
-  
+
 @if (IsNotifyPropertyChangedEnabled)
 {
-    @foreach (var i in ItemSource.For())
+    @foreach (var i in ItemSource.For(Filter))
     {
         <Observable Source="@i">  @ChildContent(i) </Observable>
     }
 }
 else
 {
-    @foreach (var i in ItemSource)
-    { 
+    @foreach (var i in ItemSource.For(Filter))
+    {
         @ChildContent(i)
     }
 }
     
 @code {
-     
+
     private IReadOnlyList<TItem> _itemSource;
 
     [Parameter]
@@ -27,6 +27,9 @@ else
 
     [Parameter]
     public bool IsNotifyPropertyChangedEnabled { get; set; }
+
+    [Parameter]
+    public Predicate<TItem>? Filter { get; set; }
 
     [Parameter]
     public IReadOnlyList<TItem> ItemSource
@@ -42,19 +45,11 @@ else
 
             if (_itemSource != null && _itemSource is INotifyCollectionChanged npc2)
                 npc2.CollectionChanged += OnCollectionChanged;
-
-
-
-
         }
     }
-
-
 
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         this.InvokeAsync(this.StateHasChanged);
-
     }
-
 }
