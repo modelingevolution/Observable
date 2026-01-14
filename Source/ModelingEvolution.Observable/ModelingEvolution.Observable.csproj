@@ -6,8 +6,9 @@
     <Nullable>enable</Nullable>
     <Title>Observable</Title>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <AssemblyVersion>0.0.0.1</AssemblyVersion>
-    <FileVersion>0.0.0.1</FileVersion>
+    <Version>0.0.6.4</Version>
+    <AssemblyVersion>0.0.6.4</AssemblyVersion>
+    <FileVersion>0.0.6.4</FileVersion>
     <PackageTags>Observable;MVVM</PackageTags>
     <PackageDescription>Minimal classes for Observable</PackageDescription>
     <PackageReadmeFile>README.md</PackageReadmeFile>

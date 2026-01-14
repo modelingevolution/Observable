@@ -24,6 +24,7 @@ jobs:
     - name: Update version in csproj files
       run: |
         VERSION="${{ steps.version.outputs.VERSION }}"
+        find . -name "*.csproj" -exec sed -i "s/<Version>.*<\/Version>/<Version>$VERSION<\/Version>/" {} \;
         find . -name "*.csproj" -exec sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>$VERSION<\/AssemblyVersion>/" {} \;
         find . -name "*.csproj" -exec sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>$VERSION<\/FileVersion>/" {} \;
 
