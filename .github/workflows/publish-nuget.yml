@@ -43,7 +43,17 @@ jobs:
     - name: List packages
       run: ls -la ./nupkg/
 
-    - name: Push to NuGet
+    - name: Push to ModelingEvolution NuGet
+      run: |
+        for pkg in ./nupkg/*.nupkg; do
+          dotnet nuget push "$pkg" \
+            --api-key ${{ secrets.NUGET_API_KEY_ME }} \
+            --source https://nuget.modelingevolution.com/v3/index.json \
+            --skip-duplicate
+        done
+      continue-on-error: true
+
+    - name: Push to NuGet.org
       run: |
         for pkg in ./nupkg/*.nupkg; do
           dotnet nuget push "$pkg" \
