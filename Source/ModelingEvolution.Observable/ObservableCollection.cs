@@ -41,6 +41,36 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
     /// </summary>
     public void Move(int oldIndex, int newIndex) => MoveItem(oldIndex, newIndex);
 
+    /// <summary>
+    /// Binary search on a sorted collection. Returns the index of the item if found,
+    /// or the bitwise complement (~index) of the insertion point if not found.
+    /// </summary>
+    public int BinarySearch(T item, IComparer<T>? comparer = null)
+    {
+        comparer ??= Comparer<T>.Default;
+        int lo = 0, hi = Count - 1;
+        while (lo <= hi)
+        {
+            int mid = lo + (hi - lo) / 2;
+            int cmp = comparer.Compare(Items[mid], item);
+            if (cmp == 0) return mid;
+            if (cmp < 0) lo = mid + 1;
+            else hi = mid - 1;
+        }
+        return ~lo;
+    }
+
+    /// <summary>
+    /// Inserts an item into the collection maintaining sorted order.
+    /// Uses binary search to find the correct insertion point.
+    /// </summary>
+    public void InsertSorted(T item, IComparer<T>? comparer = null)
+    {
+        int index = BinarySearch(item, comparer);
+        if (index < 0) index = ~index;
+        InsertItem(index, item);
+    }
+
     event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged
     {
         add => PropertyChanged += value;
