@@ -113,6 +113,38 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
 }
 ```
 
+### Sorted Insertion
+
+`ObservableCollection<T>` supports maintaining sorted order via binary search:
+
+```csharp
+// Insert maintaining sorted order — uses IComparable<T> by default.
+var items = new ObservableCollection<DeviceTypeInfo>();
+items.InsertSorted(newItem);
+
+// Or provide a custom comparer.
+items.InsertSorted(newItem, Comparer<DeviceTypeInfo>.Create((a, b) => a.Name.CompareTo(b.Name)));
+```
+
+`BinarySearch` follows the same convention as `List<T>.BinarySearch`: it returns
+the zero-based index of the item if found, or the bitwise complement (`~index`)
+of the insertion point if not found.
+
+```csharp
+int index = items.BinarySearch(target);
+if (index < 0)
+{
+    int insertionPoint = ~index;
+    // target not found — insertionPoint is where it would go
+}
+```
+
+```csharp
+// Full signatures
+public int BinarySearch(T item, IComparer<T>? comparer = null)
+public void InsertSorted(T item, IComparer<T>? comparer = null)
+```
+
 ## ObservableCollectionView\<T\>
 
 Filtered view over an `IList<T>` that implements `INotifyCollectionChanged`.
