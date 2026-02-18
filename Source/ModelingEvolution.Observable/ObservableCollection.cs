@@ -42,9 +42,18 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
     public void Move(int oldIndex, int newIndex) => MoveItem(oldIndex, newIndex);
 
     /// <summary>
-    /// Binary search on a sorted collection. Returns the index of the item if found,
-    /// or the bitwise complement (~index) of the insertion point if not found.
+    /// Performs a binary search on a sorted collection.
+    /// The collection must already be sorted according to <paramref name="comparer"/>
+    /// (or <see cref="Comparer{T}.Default"/> when <c>null</c>).
     /// </summary>
+    /// <param name="item">The item to search for.</param>
+    /// <param name="comparer">
+    /// The comparer to use. When <c>null</c>, <see cref="Comparer{T}.Default"/> is used.
+    /// </param>
+    /// <returns>
+    /// The zero-based index of <paramref name="item"/> if found;
+    /// otherwise, the bitwise complement (<c>~index</c>) of the insertion point.
+    /// </returns>
     public int BinarySearch(T item, IComparer<T>? comparer = null)
     {
         comparer ??= Comparer<T>.Default;
@@ -62,8 +71,13 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
 
     /// <summary>
     /// Inserts an item into the collection maintaining sorted order.
-    /// Uses binary search to find the correct insertion point.
+    /// Uses <see cref="BinarySearch"/> to find the correct insertion point
+    /// and raises <see cref="CollectionChanged"/>.
     /// </summary>
+    /// <param name="item">The item to insert.</param>
+    /// <param name="comparer">
+    /// The comparer to use. When <c>null</c>, <see cref="Comparer{T}.Default"/> is used.
+    /// </param>
     public void InsertSorted(T item, IComparer<T>? comparer = null)
     {
         int index = BinarySearch(item, comparer);

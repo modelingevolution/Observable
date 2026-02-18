@@ -13,7 +13,7 @@
     <PackageDescription>Minimal classes for Observable</PackageDescription>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/modelingevolution/observable</RepositoryUrl>
-    <GenerateDocumentationFile>False</GenerateDocumentationFile>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <Copyright>ModelingEvolution</Copyright>
     <Authors>ModelingEvolution Team</Authors>
   </PropertyGroup>
