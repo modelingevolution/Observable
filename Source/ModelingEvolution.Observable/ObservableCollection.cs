@@ -4,6 +4,7 @@
 //
 // Modified by ModelingEvolution: added CollectionChanged subscriber tracking
 // with SubscribersAvailable event for lifecycle management.
+// Added ReaderWriterLockSlim for thread safety.
 
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -15,9 +16,11 @@ namespace ModelingEvolution.Observable;
 /// Drop-in replacement for <see cref="System.Collections.ObjectModel.ObservableCollection{T}"/>
 /// that tracks <see cref="CollectionChanged"/> subscriber count and raises
 /// <see cref="SubscribersAvailable"/> on 0→1 and 1→0 transitions.
+/// Thread-safe via <see cref="ReaderWriterLockSlim"/>.
 /// </summary>
 public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, INotifyPropertyChanged
 {
+    private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.SupportsRecursion);
     private int _blockReentrancyCount;
     private int _subscriberCount;
     private NotifyCollectionChangedEventHandler? _collectionChanged;
@@ -42,6 +45,31 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
     public void Move(int oldIndex, int newIndex) => MoveItem(oldIndex, newIndex);
 
     /// <summary>
+    /// Returns an enumerator that acquires a read lock per element access,
+    /// releasing it before yielding so the lock is not held across the enumeration.
+    /// </summary>
+    public new IEnumerator<T> GetEnumerator()
+    {
+        int i = 0;
+        while (true)
+        {
+            T item;
+            _lock.EnterReadLock();
+            try
+            {
+                if (i >= Count) yield break;
+                item = Items[i];
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+            i++;
+            yield return item;
+        }
+    }
+
+    /// <summary>
     /// Performs a binary search on a sorted collection.
     /// The collection must already be sorted according to <paramref name="comparer"/>
     /// (or <see cref="Comparer{T}.Default"/> when <c>null</c>).
@@ -56,17 +84,25 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
     /// </returns>
     public int BinarySearch(T item, IComparer<T>? comparer = null)
     {
-        comparer ??= Comparer<T>.Default;
-        int lo = 0, hi = Count - 1;
-        while (lo <= hi)
+        _lock.EnterReadLock();
+        try
         {
-            int mid = lo + (hi - lo) / 2;
-            int cmp = comparer.Compare(Items[mid], item);
-            if (cmp == 0) return mid;
-            if (cmp < 0) lo = mid + 1;
-            else hi = mid - 1;
+            comparer ??= Comparer<T>.Default;
+            int lo = 0, hi = Count - 1;
+            while (lo <= hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+                int cmp = comparer.Compare(Items[mid], item);
+                if (cmp == 0) return mid;
+                if (cmp < 0) lo = mid + 1;
+                else hi = mid - 1;
+            }
+            return ~lo;
         }
-        return ~lo;
+        finally
+        {
+            _lock.ExitReadLock();
+        }
     }
 
     /// <summary>
@@ -80,9 +116,25 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
     /// </param>
     public void InsertSorted(T item, IComparer<T>? comparer = null)
     {
-        int index = BinarySearch(item, comparer);
-        if (index < 0) index = ~index;
-        InsertItem(index, item);
+        _lock.EnterWriteLock();
+        try
+        {
+            comparer ??= Comparer<T>.Default;
+            int lo = 0, hi = Count - 1;
+            while (lo <= hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+                int cmp = comparer.Compare(Items[mid], item);
+                if (cmp == 0) { lo = mid; break; }
+                if (cmp < 0) lo = mid + 1;
+                else hi = mid - 1;
+            }
+            InsertItem(lo, item);
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged
@@ -113,49 +165,94 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
 
     protected override void ClearItems()
     {
-        CheckReentrancy();
-        base.ClearItems();
-        OnCountPropertyChanged();
-        OnIndexerPropertyChanged();
-        OnCollectionReset();
+        _lock.EnterWriteLock();
+        try
+        {
+            CheckReentrancy();
+            base.ClearItems();
+            OnCountPropertyChanged();
+            OnIndexerPropertyChanged();
+            OnCollectionReset();
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     protected override void RemoveItem(int index)
     {
-        CheckReentrancy();
-        T removedItem = this[index];
-        base.RemoveItem(index);
-        OnCountPropertyChanged();
-        OnIndexerPropertyChanged();
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItem, index));
+        _lock.EnterWriteLock();
+        try
+        {
+            CheckReentrancy();
+            if (index >= Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+            T removedItem = this[index];
+            base.RemoveItem(index);
+            OnCountPropertyChanged();
+            OnIndexerPropertyChanged();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItem, index));
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     protected override void InsertItem(int index, T item)
     {
-        CheckReentrancy();
-        base.InsertItem(index, item);
-        OnCountPropertyChanged();
-        OnIndexerPropertyChanged();
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
+        _lock.EnterWriteLock();
+        try
+        {
+            CheckReentrancy();
+            // Clamp index — Collection<T>.Add reads Count before we acquire the lock,
+            // so concurrent removes can make the index stale.
+            if (index > Count) index = Count;
+            base.InsertItem(index, item);
+            OnCountPropertyChanged();
+            OnIndexerPropertyChanged();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     protected override void SetItem(int index, T item)
     {
-        CheckReentrancy();
-        T originalItem = this[index];
-        base.SetItem(index, item);
-        OnIndexerPropertyChanged();
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, item, originalItem, index));
+        _lock.EnterWriteLock();
+        try
+        {
+            CheckReentrancy();
+            T originalItem = this[index];
+            base.SetItem(index, item);
+            OnIndexerPropertyChanged();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, item, originalItem, index));
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     protected virtual void MoveItem(int oldIndex, int newIndex)
     {
-        CheckReentrancy();
-        T removedItem = this[oldIndex];
-        base.RemoveItem(oldIndex);
-        base.InsertItem(newIndex, removedItem);
-        OnIndexerPropertyChanged();
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, removedItem, newIndex, oldIndex));
+        _lock.EnterWriteLock();
+        try
+        {
+            CheckReentrancy();
+            T removedItem = this[oldIndex];
+            base.RemoveItem(oldIndex);
+            base.InsertItem(newIndex, removedItem);
+            OnIndexerPropertyChanged();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, removedItem, newIndex, oldIndex));
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
     }
 
     protected virtual void OnPropertyChanged(PropertyChangedEventArgs e)
