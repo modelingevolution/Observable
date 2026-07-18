@@ -28,6 +28,7 @@ namespace ModelingEvolution.Observable
         private readonly IList<T> _internal;
         private readonly ObservableCollection<T> _filtered;
         private Predicate<T> _filter;
+        private IComparer<T> _comparer;
 
         /// <summary>
         /// Gets or sets the filter predicate. Setting a new value automatically calls <see cref="Merge"/> to update the view.
@@ -39,8 +40,91 @@ namespace ModelingEvolution.Observable
             set
             {
                 this._filter = value == null ? (Predicate<T>)(x => true) : value;
-                this.Merge();
+                this.Resort();
             }
+        }
+
+        /// <summary>
+        /// Gets or sets the comparer used to keep the view sorted. Returns <c>null</c> when no sort is active.
+        /// Setting to <c>null</c> restores source/insertion order.
+        /// </summary>
+        public IComparer<T> Comparer
+        {
+            get => this._comparer;
+            set
+            {
+                this._comparer = value;
+                this.Resort();
+            }
+        }
+
+        /// <summary>Gets a value indicating whether a sort comparer is currently active.</summary>
+        public bool IsSorted => this._comparer != null;
+
+        /// <summary>Sorts the view by the given key.</summary>
+        /// <param name="key">The key selector.</param>
+        /// <param name="descending">When <c>true</c>, sorts descending; otherwise ascending.</param>
+        public void SortBy<TKey>(Func<T, TKey> key, bool descending = false)
+        {
+            Comparer<TKey> keyComparer = Comparer<TKey>.Default;
+            this.Comparer = Comparer<T>.Create((a, b) =>
+                descending ? keyComparer.Compare(key(b), key(a)) : keyComparer.Compare(key(a), key(b)));
+        }
+
+        /// <summary>Adds a secondary sort key, applied when the primary (and any previously added) keys compare equal.</summary>
+        /// <param name="key">The key selector.</param>
+        /// <param name="descending">When <c>true</c>, sorts descending; otherwise ascending.</param>
+        public void ThenBy<TKey>(Func<T, TKey> key, bool descending = false)
+        {
+            Comparer<TKey> keyComparer = Comparer<TKey>.Default;
+            IComparer<T> next = Comparer<T>.Create((a, b) =>
+                descending ? keyComparer.Compare(key(b), key(a)) : keyComparer.Compare(key(a), key(b)));
+            IComparer<T> previous = this._comparer;
+            this.Comparer = previous == null
+                ? next
+                : Comparer<T>.Create((a, b) =>
+                {
+                    int result = previous.Compare(a, b);
+                    return result != 0 ? result : next.Compare(a, b);
+                });
+        }
+
+        private void Resort()
+        {
+            if (this._comparer == null)
+            {
+                this.Merge();
+                return;
+            }
+            List<T> target = this._internal
+                .Where<T>((Func<T, bool>)(x => this._filter(x)))
+                .OrderBy<T, T>(x => x, this._comparer)
+                .ToList<T>();
+            this.SyncFiltered(target);
+        }
+
+        private void SyncFiltered(List<T> target)
+        {
+            for (int i = 0; i < target.Count; ++i)
+            {
+                if (i < this._filtered.Count && (object)this._filtered[i] == (object)target[i])
+                    continue;
+                int found = -1;
+                for (int j = i + 1; j < this._filtered.Count; ++j)
+                {
+                    if ((object)this._filtered[j] == (object)target[i])
+                    {
+                        found = j;
+                        break;
+                    }
+                }
+                if (found >= 0)
+                    this._filtered.Move(found, i);
+                else
+                    this._filtered.Insert(i, target[i]);
+            }
+            while (this._filtered.Count > target.Count)
+                this._filtered.RemoveAt(this._filtered.Count - 1);
         }
 
         private void Merge()
@@ -111,7 +195,16 @@ namespace ModelingEvolution.Observable
         private void SourceCollectionChanged(object s, NotifyCollectionChangedEventArgs args)
         {
             if (args.Action == NotifyCollectionChangedAction.Add)
-                this._filtered.AddRange<T>((IEnumerable<T>)args.NewItems.OfType<T>().Where<T>((Func<T, bool>)(x => this._filter(x))).ToArray<T>());
+            {
+                T[] array = args.NewItems.OfType<T>().Where<T>((Func<T, bool>)(x => this._filter(x))).ToArray<T>();
+                if (this._comparer != null)
+                {
+                    foreach (T item in array)
+                        this._filtered.InsertSorted(item, this._comparer);
+                }
+                else
+                    this._filtered.AddRange<T>((IEnumerable<T>)array);
+            }
             else if (args.Action == NotifyCollectionChangedAction.Remove)
             {
                 foreach (T obj in args.OldItems.OfType<T>().Where<T>((Func<T, bool>)(x => this._filter(x))))
@@ -119,12 +212,28 @@ namespace ModelingEvolution.Observable
             }
             else if (args.Action == NotifyCollectionChangedAction.Replace)
             {
-                for (int index1 = 0; index1 < args.NewItems.Count; ++index1)
+                if (this._comparer != null)
                 {
-                    T newItem = (T)args.NewItems[index1];
-                    int index2 = this._filtered.IndexOf(newItem);
-                    if (index2 >= 0)
-                        this._filtered[index2] = newItem;
+                    for (int index = 0; index < args.NewItems.Count; ++index)
+                    {
+                        T oldItem = (T)args.OldItems[index];
+                        int oldIndex = this._filtered.IndexOf(oldItem);
+                        if (oldIndex >= 0)
+                            this._filtered.RemoveAt(oldIndex);
+                        T newItem = (T)args.NewItems[index];
+                        if (this._filter(newItem))
+                            this._filtered.InsertSorted(newItem, this._comparer);
+                    }
+                }
+                else
+                {
+                    for (int index1 = 0; index1 < args.NewItems.Count; ++index1)
+                    {
+                        T newItem = (T)args.NewItems[index1];
+                        int index2 = this._filtered.IndexOf(newItem);
+                        if (index2 >= 0)
+                            this._filtered[index2] = newItem;
+                    }
                 }
             }
             else
@@ -132,7 +241,8 @@ namespace ModelingEvolution.Observable
                 if (args.Action != NotifyCollectionChangedAction.Reset)
                     return;
                 this._filtered.Clear();
-                this._filtered.AddRange<T>(this._internal.Where<T>((Func<T, bool>)(x => this._filter(x))));
+                IEnumerable<T> filtered = this._internal.Where<T>((Func<T, bool>)(x => this._filter(x)));
+                this._filtered.AddRange<T>(this._comparer != null ? filtered.OrderBy<T, T>(x => x, this._comparer) : filtered);
             }
         }
 
