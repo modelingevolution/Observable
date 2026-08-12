@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -378,7 +378,14 @@ namespace ModelingEvolution.Observable
                 {
                     item = list[i];
                 }
-                catch
+                // ONLY the index race a concurrent shrink causes — the documented "graceful stop".
+                // The previous bare catch swallowed EVERY exception (a throwing indexer, OOM, anything)
+                // and silently truncated the render — 2026-08-11 UI review, F5.2.
+                catch (ArgumentOutOfRangeException)
+                {
+                    isOk = false;
+                }
+                catch (IndexOutOfRangeException)
                 {
                     isOk = false;
                 }

@@ -2,6 +2,7 @@
 @using System.Collections.Specialized
 
 @typeparam TItem
+@implements IDisposable
 
 @if (ItemSource.Count == 0 && EmptyContent != null)
 {
@@ -57,6 +58,22 @@ else
 
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        this.InvokeAsync(this.StateHasChanged);
+        if (_disposed) return;
+        _ = this.InvokeAsync(this.StateHasChanged);
+    }
+
+    private bool _disposed;
+
+    // The component subscribes to the source's CollectionChanged in the ItemSource setter. Without this Dispose,
+    // binding a PROCESS-LIFETIME source (a singleton read model's collection) permanently roots the component's
+    // whole render tree: every visit to the page adds one more dead handler, and every fold invokes them all.
+    // Found live in the ERP (2026-08-11 UI review, F1). The item-level <Observable> child always disposed
+    // correctly — this collection-level subscription was the single gap.
+    public void Dispose()
+    {
+        _disposed = true;
+        if (_itemSource is INotifyCollectionChanged npc)
+            npc.CollectionChanged -= OnCollectionChanged;
+        _itemSource = null!;
     }
 }

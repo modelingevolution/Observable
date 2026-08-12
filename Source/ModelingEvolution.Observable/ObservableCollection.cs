@@ -1,4 +1,4 @@
-// Based on Microsoft .NET Runtime ObservableCollection<T>
+﻿// Based on Microsoft .NET Runtime ObservableCollection<T>
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 //
@@ -45,28 +45,28 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
     public void Move(int oldIndex, int newIndex) => MoveItem(oldIndex, newIndex);
 
     /// <summary>
-    /// Returns an enumerator that acquires a read lock per element access,
-    /// releasing it before yielding so the lock is not held across the enumeration.
+    /// Returns an enumerator over a SNAPSHOT taken under one read lock. The previous per-element
+    /// locking was not a snapshot: a concurrent insert BEFORE the cursor shifted the tail and the
+    /// element at the cursor was read twice (a duplicated row, silently) — found live in the ERP's
+    /// bank-transactions fold (2026-08-11 UI review, F5.1). One allocation per enumeration is the
+    /// price of a correct, tear-free read; enumeration never holds the lock across consumer code.
+    /// NOTE: reachable only through the CONCRETE type — access via IEnumerable&lt;T&gt;/LINQ binds to
+    /// Collection&lt;T&gt;'s unlocked enumerator ("new" hiding, not an override).
     /// </summary>
     public new IEnumerator<T> GetEnumerator()
     {
-        int i = 0;
-        while (true)
+        T[] snapshot;
+        _lock.EnterReadLock();
+        try
         {
-            T item;
-            _lock.EnterReadLock();
-            try
-            {
-                if (i >= Count) yield break;
-                item = Items[i];
-            }
-            finally
-            {
-                _lock.ExitReadLock();
-            }
-            i++;
-            yield return item;
+            snapshot = new T[Count];
+            Items.CopyTo(snapshot, 0);
         }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+        return ((IEnumerable<T>)snapshot).GetEnumerator();
     }
 
     /// <summary>
@@ -149,15 +149,28 @@ public class ObservableCollection<T> : Collection<T>, INotifyCollectionChanged, 
     /// </summary>
     public event NotifyCollectionChangedEventHandler? CollectionChanged
     {
+        // += / -= on a plain delegate field is a non-atomic read-modify-write: two circuits
+        // subscribing concurrently could lose one delegate (a page that silently stops updating) —
+        // 2026-08-11 UI review, F5.3. The counter was already Interlocked; the delegate now is too.
         add
         {
-            _collectionChanged += value;
+            NotifyCollectionChangedEventHandler? current, updated;
+            do
+            {
+                current = _collectionChanged;
+                updated = (NotifyCollectionChangedEventHandler?)Delegate.Combine(current, value);
+            } while (Interlocked.CompareExchange(ref _collectionChanged, updated, current) != current);
             if (Interlocked.Increment(ref _subscriberCount) == 1)
                 SubscribersAvailable?.Invoke(true);
         }
         remove
         {
-            _collectionChanged -= value;
+            NotifyCollectionChangedEventHandler? current, updated;
+            do
+            {
+                current = _collectionChanged;
+                updated = (NotifyCollectionChangedEventHandler?)Delegate.Remove(current, value);
+            } while (Interlocked.CompareExchange(ref _collectionChanged, updated, current) != current);
             if (Interlocked.Decrement(ref _subscriberCount) == 0)
                 SubscribersAvailable?.Invoke(false);
         }
