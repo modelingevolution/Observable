@@ -30,6 +30,7 @@ public class ObservableCollectionView<TDst, TSrc> :
     private readonly IList<TSrc> _internal;
     private readonly ObservableCollection<TDst> _filtered;
     private Predicate<TDst> _filter;
+    private IComparer<TDst> _comparer;
     private static readonly Predicate<TDst> _trueFilter = (Predicate<TDst>)(x => true);
 
     /// <summary>Gets or sets the filter predicate. Returns <c>null</c> when no filter is active. Setting to <c>null</c> removes the filter.</summary>
@@ -39,8 +40,89 @@ public class ObservableCollectionView<TDst, TSrc> :
         set
         {
             this._filter = value == null ? ObservableCollectionView<TDst, TSrc>._trueFilter : value;
-            this.Merge();
+            this.Resort();
         }
+    }
+
+    /// <summary>Gets or sets the comparer used to keep the view sorted. Returns <c>null</c> when no sort is active. Setting to <c>null</c> restores source/insertion order.</summary>
+    public IComparer<TDst> Comparer
+    {
+        get => this._comparer;
+        set
+        {
+            this._comparer = value;
+            this.Resort();
+        }
+    }
+
+    /// <summary>Gets a value indicating whether a sort comparer is currently active.</summary>
+    public bool IsSorted => this._comparer != null;
+
+    /// <summary>Sorts the view by the given key.</summary>
+    /// <param name="key">The key selector.</param>
+    /// <param name="descending">When <c>true</c>, sorts descending; otherwise ascending.</param>
+    public void SortBy<TKey>(Func<TDst, TKey> key, bool descending = false)
+    {
+        Comparer<TKey> keyComparer = Comparer<TKey>.Default;
+        this.Comparer = Comparer<TDst>.Create((a, b) =>
+            descending ? keyComparer.Compare(key(b), key(a)) : keyComparer.Compare(key(a), key(b)));
+    }
+
+    /// <summary>Adds a secondary sort key, applied when the primary (and any previously added) keys compare equal.</summary>
+    /// <param name="key">The key selector.</param>
+    /// <param name="descending">When <c>true</c>, sorts descending; otherwise ascending.</param>
+    public void ThenBy<TKey>(Func<TDst, TKey> key, bool descending = false)
+    {
+        Comparer<TKey> keyComparer = Comparer<TKey>.Default;
+        IComparer<TDst> next = Comparer<TDst>.Create((a, b) =>
+            descending ? keyComparer.Compare(key(b), key(a)) : keyComparer.Compare(key(a), key(b)));
+        IComparer<TDst> previous = this._comparer;
+        this.Comparer = previous == null
+            ? next
+            : Comparer<TDst>.Create((a, b) =>
+            {
+                int result = previous.Compare(a, b);
+                return result != 0 ? result : next.Compare(a, b);
+            });
+    }
+
+    private void Resort()
+    {
+        if (this._comparer == null)
+        {
+            this.Merge();
+            return;
+        }
+        List<TDst> target = this._internal
+            .Select<TSrc, TDst>(this._convertItem)
+            .Where<TDst>((Func<TDst, bool>)(x => this._filter(x)))
+            .OrderBy<TDst, TDst>(x => x, this._comparer)
+            .ToList<TDst>();
+        this.SyncFiltered(target);
+    }
+
+    private void SyncFiltered(List<TDst> target)
+    {
+        for (int i = 0; i < target.Count; ++i)
+        {
+            if (i < this._filtered.Count && (object)this._filtered[i].Source == (object)target[i].Source)
+                continue;
+            int found = -1;
+            for (int j = i + 1; j < this._filtered.Count; ++j)
+            {
+                if ((object)this._filtered[j].Source == (object)target[i].Source)
+                {
+                    found = j;
+                    break;
+                }
+            }
+            if (found >= 0)
+                this._filtered.Move(found, i);
+            else
+                this._filtered.Insert(i, target[i]);
+        }
+        while (this._filtered.Count > target.Count)
+            this._filtered.RemoveAt(this._filtered.Count - 1);
     }
 
     private void Merge()
@@ -122,7 +204,12 @@ public class ObservableCollectionView<TDst, TSrc> :
         if (args.Action == NotifyCollectionChangedAction.Add)
         {
             TDst[] array = args.NewItems.OfType<TSrc>().Select<TSrc, TDst>(this._convertItem).Where<TDst>((Func<TDst, bool>)(x => this._filter(x))).ToArray<TDst>();
-            if (!this.IsFiltered)
+            if (this._comparer != null)
+            {
+                foreach (TDst dst in array)
+                    this._filtered.InsertSorted(dst, this._comparer);
+            }
+            else if (!this.IsFiltered)
             {
                 if (args.NewStartingIndex == this._filtered.Count)
                 {
@@ -144,17 +231,45 @@ public class ObservableCollectionView<TDst, TSrc> :
         }
         else if (args.Action == NotifyCollectionChangedAction.Replace)
         {
-            if (this.IsFiltered)
+            if (this._comparer != null)
+            {
+                for (int index = 0; index < args.NewItems.Count; ++index)
+                {
+                    TSrc oldSrc = (TSrc)args.OldItems[index];
+                    int oldIndex = -1;
+                    for (int j = 0; j < this._filtered.Count; ++j)
+                    {
+                        if ((object)this._filtered[j].Source == (object)oldSrc)
+                        {
+                            oldIndex = j;
+                            break;
+                        }
+                    }
+                    if (oldIndex >= 0)
+                        this._filtered.RemoveAt(oldIndex);
+                    TDst newDst = this._convertItem((TSrc)args.NewItems[index]);
+                    if (this._filter(newDst))
+                        this._filtered.InsertSorted(newDst, this._comparer);
+                }
+            }
+            else if (this.IsFiltered)
                 throw new NotSupportedException();
-            for (int index = 0; index < args.NewItems.Count; ++index)
-                this._filtered[index + args.OldStartingIndex] = this._convertItem((TSrc)args.NewItems[index]);
+            else
+                for (int index = 0; index < args.NewItems.Count; ++index)
+                    this._filtered[index + args.OldStartingIndex] = this._convertItem((TSrc)args.NewItems[index]);
         }
         else
         {
             if (args.Action != NotifyCollectionChangedAction.Reset)
                 return;
             this._filtered.Clear();
-            this._filtered.AddRange<TDst>(this._internal.Select<TSrc, TDst>(this._convertItem));
+            if (this._comparer != null)
+            {
+                IEnumerable<TDst> target = this._internal.Select<TSrc, TDst>(this._convertItem).Where<TDst>((Func<TDst, bool>)(x => this._filter(x))).OrderBy<TDst, TDst>(x => x, this._comparer);
+                this._filtered.AddRange<TDst>(target);
+            }
+            else
+                this._filtered.AddRange<TDst>(this._internal.Select<TSrc, TDst>(this._convertItem));
         }
     }
 
