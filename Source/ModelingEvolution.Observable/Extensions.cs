@@ -341,7 +341,7 @@ namespace ModelingEvolution.Observable
         /// <returns>An enumerator for the filtered collection.</returns>
         public IEnumerator<T> GetEnumerator()
         {
-            foreach (T obj in (Collection<T>)this._filtered)
+            foreach (T obj in this._filtered)
                 yield return obj;
         }
 

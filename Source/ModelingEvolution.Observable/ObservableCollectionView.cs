@@ -340,7 +340,7 @@ public class ObservableCollectionView<TDst, TSrc> :
     /// <returns>An enumerator for the view items.</returns>
     public IEnumerator<TDst> GetEnumerator()
     {
-        foreach (TDst dst in (Collection<TDst>)this._filtered)
+        foreach (TDst dst in this._filtered)
             yield return dst;
     }
 
