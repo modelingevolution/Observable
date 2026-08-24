@@ -227,12 +227,29 @@ namespace ModelingEvolution.Observable
                 }
                 else
                 {
+                    // Locate the row by the OLD value, exactly as the sorted branch above does. Looking it up by the
+                    // NEW value cannot work: the new value is by construction not in the view yet, so the lookup
+                    // missed and every in-place update to a record-shaped row was silently dropped — the view kept
+                    // rendering the stale row and nothing was raised to tell a bound page otherwise.
                     for (int index1 = 0; index1 < args.NewItems.Count; ++index1)
                     {
+                        T oldItem = (T)args.OldItems[index1];
+                        int oldIndex = this._filtered.IndexOf(oldItem);
                         T newItem = (T)args.NewItems[index1];
-                        int index2 = this._filtered.IndexOf(newItem);
-                        if (index2 >= 0)
-                            this._filtered[index2] = newItem;
+                        if (this._filter(newItem))
+                        {
+                            // In place when the row is already on screen — an unsorted view must not reorder, and
+                            // assigning through the indexer raises Replace, which is what re-renders the binding.
+                            if (oldIndex >= 0)
+                                this._filtered[oldIndex] = newItem;
+                            else
+                                this._filtered.Add(newItem);
+                        }
+                        else if (oldIndex >= 0)
+                        {
+                            // It no longer matches: leaving it visible is the same staleness as dropping the update.
+                            this._filtered.RemoveAt(oldIndex);
+                        }
                     }
                 }
             }
