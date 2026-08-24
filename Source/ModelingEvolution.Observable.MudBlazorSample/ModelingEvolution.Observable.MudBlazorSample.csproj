@@ -8,7 +8,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ModelingEvolution.MudBlazor" Version="9.7.0.2" />
+    <PackageReference Include="ModelingEvolution.MudBlazor" Version="9.7.0.3" />
     <PackageReference Include="ModelingEvolution.Observable" Version="1.0.0" />
   </ItemGroup>
 </Project>
