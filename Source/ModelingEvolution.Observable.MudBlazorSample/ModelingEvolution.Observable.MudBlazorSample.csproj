@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Manual check for epic 084: ModelingEvolution.MudBlazor (fork) + ModelingEvolution.Observable 1.0.
+       A background fold mutates an ObservableCollection from a non-UI thread while MudTable renders it. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelingEvolution.MudBlazor" Version="9.7.0.2" />
+    <PackageReference Include="ModelingEvolution.Observable" Version="1.0.0" />
+  </ItemGroup>
+</Project>

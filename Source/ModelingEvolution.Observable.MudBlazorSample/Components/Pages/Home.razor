@@ -1,0 +1,43 @@
+@page "/"
+@inject LiveRows Live
+@implements IDisposable
+
+<MudThemeProvider IsDarkMode="true" />
+<MudPopoverProvider />
+
+<MudContainer Class="pa-4">
+    <MudText Typo="Typo.h5">Epic 084 — MudTable over a live ObservableCollection</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">
+        Fold thread mutates the collection every 50 ms (add / insert-at-0 / remove / in-place Hits++). The table is
+        never handed a new collection and the page never calls StateHasChanged.
+    </MudText>
+    <MudStack Row="true" Class="mb-2">
+        <MudSwitch T="bool" @bind-Value="_collection" Color="Color.Primary" Label="AutoReloadOnCollectionChanged" />
+        <MudSwitch T="bool" @bind-Value="_items" Color="Color.Secondary" Label="AutoReloadOnItemPropertyChanged" />
+        <MudText Class="align-self-center" data-testid="folded">folded: @Interlocked.Read(ref Live.Folded) · rows: @Live.Rows.Count (page-level text: refreshes only when the page re-renders — the table below refreshes itself)</MudText>
+    </MudStack>
+
+    <MudTable T="Row" Items="Live.Rows" Dense="true" Hover="true" Elevation="1"
+              AutoReloadOnCollectionChanged="_collection" AutoReloadOnItemPropertyChanged="_items"
+              SortLabel="Id" data-testid="live-table">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="@((Row r) => r.Id)">Id</MudTableSortLabel></MudTh>
+            <MudTh>Name</MudTh>
+            <MudTh><MudTableSortLabel SortBy="@((Row r) => r.Hits)">Hits</MudTableSortLabel></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Id">@context.Id</MudTd>
+            <MudTd DataLabel="Name">@context.Name</MudTd>
+            <MudTd DataLabel="Hits">@context.Hits</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private bool _collection = true;
+    private bool _items = true;
+    public void Dispose() { }
+}
