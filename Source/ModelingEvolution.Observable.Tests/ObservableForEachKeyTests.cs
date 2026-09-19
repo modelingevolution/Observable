@@ -305,6 +305,26 @@ public class ObservableForEachKeyTests
             "with no Key, the instance that rendered m0 is recycled onto m1 — positional matching, unchanged");
     }
 
+    [Theory]
+    [MemberData(nameof(Branches))]
+    public void WithKey_ProducesByteIdenticalMarkupToWithoutKey(bool inpc)
+    {
+        // Answers the "a wrapper changes the DOM for every consumer" objection directly.
+        // KeyedItem is a component whose whole body is @ChildContent: it emits no element and no
+        // attribute, so turning Key on changes the render tree's KEYS, never its markup.
+        using var ctx1 = new BunitContext();
+        using var ctx2 = new BunitContext();
+        var unkeyed = RenderList(ctx1, Window(0, 4), inpc).Markup;
+        var keyed = RenderList(ctx2, Window(0, 4), inpc, key: m => m.Id).Markup;
+
+        StripInstanceIds(keyed).Should().Be(StripInstanceIds(unkeyed),
+            "setting Key must not add, remove or alter a single byte of rendered markup");
+    }
+
+    /// <summary>Component instance ids differ between two independent renders; everything else must not.</summary>
+    private static string StripInstanceIds(string markup)
+        => System.Text.RegularExpressions.Regex.Replace(markup, @"data-instance=""\d+""", @"data-instance=""#""");
+
     // ---------- Duplicate keys: documented, tested fact ----------
 
     [Theory]
