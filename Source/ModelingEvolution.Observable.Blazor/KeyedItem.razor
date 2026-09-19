@@ -1,0 +1,20 @@
+@*
+    A do-nothing wrapper whose only job is to be something ObservableForEach can put an @key on.
+
+    Why it is needed: when ObservableForEach renders `@ChildContent(i)` directly in the loop, the
+    compiler emits RenderTreeBuilder.AddContent(seq, RenderFragment<T>, value), and that overload
+    wraps the fragment in a render-tree REGION. Blazor's keyed matching only matches frames that are
+    direct siblings in the same frame list, so a @key the consumer writes inside ChildContent is
+    trapped in that region and can never match an item across a positional shift.
+
+    KeyedItem gives the loop a direct child of its own to key. It renders no element and no attribute
+    of its own, so the consumer's markup is unchanged.
+
+    It is only rendered when ObservableForEach.Key is set; with Key null the loop body is exactly
+    what it always was.
+*@
+@ChildContent
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
