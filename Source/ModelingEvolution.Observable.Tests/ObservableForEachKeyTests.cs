@@ -340,9 +340,22 @@ public class ObservableForEachKeyTests
 
         var act = () => RenderList(ctx, source, inpc, key: m => m.Id);
 
-        act.Should().Throw<InvalidOperationException>()
+        var ex = act.Should().Throw<InvalidOperationException>()
             .WithMessage("*more than one sibling*same key*",
-                "Blazor refuses duplicate sibling keys — Key must be unique among the rendered items");
+                "Blazor refuses duplicate sibling keys — Key must be unique among the rendered items")
+            .Which;
+
+        // The README quotes these component names verbatim, because the exception names a type the
+        // consumer never wrote and they would otherwise search for a string that never appears.
+        // Bind the doc to the runtime: if Blazor or a rename ever changes them, this fails instead
+        // of the README going quietly stale.
+        var expectedComponent = inpc
+            ? "ModelingEvolution.Observable.Blazor.Observable`1[ModelingEvolution.Observable.Tests.CardModel]"
+            : "ModelingEvolution.Observable.Blazor.KeyedItem";
+        ex.Message.Should().Contain(expectedComponent,
+            "README.md quotes this exact component name in the 'Duplicate keys' section");
+        ex.Message.Should().Contain("'dup'",
+            "README.md tells the reader the quoted key value identifies the collision");
     }
 
     // ---------- Subscription behaviour is unchanged by Key ----------

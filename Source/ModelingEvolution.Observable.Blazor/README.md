@@ -106,11 +106,45 @@ that is visible on first render:
 | unkeyed | 15 ms | 3,362 KB |
 | keyed | 46 ms | 5,864 KB |
 
-Roughly 3× the time and 1.7× the allocations — and it buys the opposite on every subsequent update,
-because surviving rows are no longer torn down and rebuilt. So keying pays for lists that **change**
-— a feed, a sliding window, a grid the user filters and sorts — and is not worth it for a large
-table that renders once and sits still.
+Roughly 3× the time and 1.7× the allocations on first render. The wrapper costs about **64 bytes per
+row per render**; in the notify branch it costs nothing, because no component is added there.
 
-Those numbers are one measurement, on one machine, under bUnit rather than a browser. Treat them as
-a guide to the shape of the trade-off, not as a guarantee; if it matters at your row counts, measure
-your own screen.
+**What it buys is DOM identity, not fewer bytes.** An earlier version of this section claimed keying
+"buys the opposite on every update". Measured, that is not true of allocation: sliding a 1000-row
+window by 40 allocates 1.06× unkeyed in the notify branch and 0.91× in the plain one — a wash either
+way. The real return is that surviving rows keep their DOM nodes, so a text selection and keyboard
+focus survive the update. That is measurable in a browser and not in these tests. Key for that
+reason, not for allocation.
+
+So keying pays for lists that **change under the user** — a feed, a sliding window, a grid they
+filter and sort while reading it — and is not worth it for a large table that renders once and sits
+still.
+
+### Value-type keys box — prefer a reference key
+
+`Key` is `Func<TItem, object?>`, so returning an `int`, a `Guid` or a tuple **boxes once per row per
+render**. Measured at 1000 rows:
+
+| key | extra allocation per render | per row |
+|---|---|---|
+| `m => m.Id` (string) | 0 | 0 B |
+| `m => m.Seq` (int) | +24 KB | 24 B |
+| `m => (m.A, m.B)` (tuple) | +24 KB | 24 B |
+| `m => $"{m.A}-{m.B}"` (composed string) | +48 to +88 KB | 48-88 B |
+
+Practical guidance:
+
+- **Prefer a key that is already a reference** — a `string` id, or the item itself when it has
+  identity. It allocates nothing.
+- **A value-type key is fine for ordinary lists.** 24 B/row is ~8-11% of a 1000-row re-render. At a
+  few hundred rows it is noise; at thousands of rows re-rendering often, it is worth removing.
+- **The composite-tuple advice above still stands** — a `(int, int)` tuple boxes into the same 24
+  bytes a plain `int` does, so a composite key costs no more than a simple one.
+- **Do not compose a string to dodge the box.** It allocates a fresh string per row per render — 2×
+  to 3.7× the cost of the box it was meant to avoid. Accept the box, or key on something that is
+  already a reference.
+
+All of these numbers are one measurement, on one machine, under bUnit rather than a browser, and
+they are pinned by tests in this repo (`ObservableForEachKeyAllocationTests`) so the guidance cannot
+drift from the code. Treat them as the shape of the trade-off, not a guarantee; if it matters at
+your row counts, measure your own screen.
