@@ -15,13 +15,19 @@ public sealed class CardModel : INotifyPropertyChanged
 {
     private string _text;
 
+    private static int _nextSeq;
+
     public CardModel(string id, string text)
     {
         Id = id;
         _text = text;
+        Seq = Interlocked.Increment(ref _nextSeq);
     }
 
     public string Id { get; }
+
+    /// <summary>A value-type identity, for measuring what a boxed key costs.</summary>
+    public int Seq { get; }
 
     public string Text
     {
