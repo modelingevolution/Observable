@@ -22,9 +22,8 @@ Set `Key` to match items by **identity** instead:
 - The keys **must be unique among the rendered items** (after `Filter`) — see
   [Duplicate keys](#duplicate-keys-an-error-naming-a-type-you-never-wrote) below.
 - Leaving `Key` unset renders exactly as before.
-- Cost: with `Key` set, the non-notify branch renders one extra component instance per row (the
-  `KeyedItem` pass-through; it emits no markup). Worth knowing before keying a table with thousands
-  of rows — it is opt-in precisely so you can decide per screen.
+- Cost: see [What keying costs](#what-keying-costs) — free in the notify branch, not free in the
+  plain one.
 - A `@key` written **inside** the child content does not work: an invoked `RenderFragment<TItem>` is
   emitted inside a render-tree region, and Blazor only matches keys among direct siblings, so such a
   key never matches across a positional shift. The key has to be applied by `ObservableForEach`.
@@ -91,3 +90,27 @@ Items = next;              // ItemSource changes once; rows present in both keep
 
 or mutate the existing collection in place (add, remove, move the individual rows that changed) so no
 `Reset` is raised at all. Both are covered by tests in this repo.
+
+### What keying costs
+
+**With `Key` unset you pay nothing.** No `KeyedItem` is ever constructed, in either branch.
+
+**In the notify branch (`IsNotifyPropertyChangedEnabled="true"`) keying is free.** The key goes on
+the `<Observable>` wrapper the component already renders, so no component is added.
+
+**In the plain branch it is not free.** Keying adds one `KeyedItem` per row, and at a thousand rows
+that is visible on first render:
+
+| 1000 rows, first render, plain branch | time | allocations |
+|---|---|---|
+| unkeyed | 15 ms | 3,362 KB |
+| keyed | 46 ms | 5,864 KB |
+
+Roughly 3× the time and 1.7× the allocations — and it buys the opposite on every subsequent update,
+because surviving rows are no longer torn down and rebuilt. So keying pays for lists that **change**
+— a feed, a sliding window, a grid the user filters and sorts — and is not worth it for a large
+table that renders once and sits still.
+
+Those numbers are one measurement, on one machine, under bUnit rather than a browser. Treat them as
+a guide to the shape of the trade-off, not as a guarantee; if it matters at your row counts, measure
+your own screen.
