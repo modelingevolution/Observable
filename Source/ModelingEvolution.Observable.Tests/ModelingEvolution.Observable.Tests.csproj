@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="bunit" Version="2.10.3" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="FluentAssertions" Version="8.9.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
@@ -21,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ModelingEvolution.Observable\ModelingEvolution.Observable.csproj" />
+    <ProjectReference Include="..\ModelingEvolution.Observable.Blazor\ModelingEvolution.Observable.Blazor.csproj" />
   </ItemGroup>
 
 </Project>

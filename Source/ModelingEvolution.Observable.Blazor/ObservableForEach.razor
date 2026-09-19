@@ -12,14 +12,28 @@ else if (IsNotifyPropertyChangedEnabled)
 {
     @foreach (var i in ItemSource.For(Filter))
     {
-        <Observable Source="@i">  @ChildContent(i) </Observable>
+        if (Key is null)
+        {
+            <Observable Source="@i">  @ChildContent(i) </Observable>
+        }
+        else
+        {
+            <Observable @key="Key(i)" Source="@i">  @ChildContent(i) </Observable>
+        }
     }
 }
 else
 {
     @foreach (var i in ItemSource.For(Filter))
     {
-        @ChildContent(i)
+        if (Key is null)
+        {
+            @ChildContent(i)
+        }
+        else
+        {
+            <KeyedItem @key="Key(i)">@ChildContent(i)</KeyedItem>
+        }
     }
 }
     
@@ -38,6 +52,43 @@ else
 
     [Parameter]
     public Predicate<TItem>? Filter { get; set; }
+
+    /// <summary>
+    /// Optional. When set, each rendered item is given a Blazor <c>@key</c> of <c>Key(item)</c>, so
+    /// Blazor matches items by IDENTITY instead of by position.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Without it, the loop body is unkeyed and Blazor diffs positionally: when the collection
+    /// slides (items dropped at the front, appended at the back), every surviving item lands at a
+    /// new index and its component subtree is re-hosted onto a different item. In a browser that
+    /// means the whole list is torn down and rebuilt — a text selection inside a surviving row is
+    /// lost and keyboard focus drops to the document body. With <c>Key</c> set, only the items that
+    /// actually entered or left the list are created or disposed; survivors keep their component
+    /// instance and their DOM nodes through inserts, removals, moves, a Reset and a filter change.
+    /// </para>
+    /// <para>
+    /// A consumer CANNOT achieve this from the outside by putting <c>@key</c> inside
+    /// <see cref="ChildContent"/>: an invoked <c>RenderFragment&lt;TItem&gt;</c> is emitted inside a
+    /// render-tree region, and Blazor only matches keys among direct siblings, so such a key is
+    /// confined to that region. The key has to be applied by this component, which is what this
+    /// parameter does.
+    /// </para>
+    /// <para>
+    /// The returned keys MUST be unique among the items actually rendered (after <see cref="Filter"/>).
+    /// Blazor throws <see cref="InvalidOperationException"/> ("more than one sibling has the same key
+    /// value") if two rendered items produce equal keys — which is why this is opt-in rather than
+    /// applied by default: a collection may legitimately hold the same instance, or equal value-type
+    /// items, twice. Keys are compared with <see cref="object.Equals(object, object)"/>. Returning
+    /// <c>null</c> for an item leaves that item unkeyed.
+    /// </para>
+    /// <para>
+    /// When <c>Key</c> is <c>null</c> (the default) rendering is exactly as it always was — nothing
+    /// is added to the render tree and matching stays positional.
+    /// </para>
+    /// </remarks>
+    [Parameter]
+    public Func<TItem, object?>? Key { get; set; }
 
     [Parameter]
     public IReadOnlyList<TItem> ItemSource
